@@ -1,149 +1,55 @@
-pip install plotly
-
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 
-st.set_page_config(page_title="FX Sensitivity Income Statement", layout="wide")
+st.set_page_config(layout="wide")
 
-st.title("📈 Income Statement FX Sensitivity")
+st.title("Income Statement FX Sensitivity")
 
-# Inputs
-st.sidebar.header("Assumptions")
+col1, col2 = st.columns(2)
 
-revenue_usd = st.sidebar.number_input(
-    "Revenue (USD)",
-    min_value=0.0,
-    value=10_000_000.0,
-    step=100_000.0,
-    format="%.0f"
-)
+with col1:
+    revenue = st.number_input("Revenue (USD)", value=10000000)
+    costs = st.number_input("Base Costs (USD)", value=7000000)
 
-total_cost_base = st.sidebar.number_input(
-    "Total Costs at Base FX (USD)",
-    min_value=0.0,
-    value=7_000_000.0,
-    step=100_000.0,
-    format="%.0f"
-)
+with col2:
+    base_fx = st.number_input("Base FX (MXN/USD)", value=17.0)
+    fx = st.slider("Current FX", 10.0, 30.0, 17.0)
 
-base_fx = st.sidebar.number_input(
-    "Base FX Rate (MXN/USD)",
-    min_value=1.0,
-    value=17.0,
-    step=0.1
-)
+mxn_cost = costs * 0.60
+usd_cost = costs * 0.40
 
-current_fx = st.sidebar.slider(
-    "Current FX Rate (MXN/USD)",
-    min_value=10.0,
-    max_value=30.0,
-    value=float(base_fx),
-    step=0.1
-)
+mxn_local = mxn_cost * base_fx
+mxn_usd = mxn_local / fx
 
-# Cost split
-mxn_cost_usd_base = total_cost_base * 0.60
-usd_cost = total_cost_base * 0.40
+adjusted_costs = mxn_usd + usd_cost
+profit = revenue - adjusted_costs
+margin = profit / revenue
 
-# Convert MXN cost to local currency at base FX
-mxn_cost_local = mxn_cost_usd_base * base_fx
-
-# Recalculate MXN cost in USD at new FX
-mxn_cost_usd_current = mxn_cost_local / current_fx
-
-# Updated costs
-total_cost_current = mxn_cost_usd_current + usd_cost
-
-# Income statement
-gross_profit = revenue_usd - total_cost_current
-
-df = pd.DataFrame({
+income_statement = pd.DataFrame({
     "Line Item": ["Revenue", "Costs", "Net Revenue"],
-    "Amount": [
-        revenue_usd,
-        -total_cost_current,
-        gross_profit
-    ]
+    "USD": [revenue, adjusted_costs, profit]
 })
 
-# Waterfall chart
-fig = go.Figure(go.Waterfall(
-    name="Income Statement",
-    orientation="v",
-    measure=["absolute", "relative", "total"],
-    x=["Revenue", "Costs", "Net Revenue"],
-    y=[revenue_usd, -total_cost_current, 0],
-    connector={"line": {"color": "gray"}}
-))
+st.subheader("Income Statement")
+st.dataframe(income_statement)
 
-fig.update_layout(
-    title=f"Income Statement at FX = {current_fx:.2f} MXN/USD",
-    height=500
-)
+c1, c2 = st.columns(2)
 
-st.plotly_chart(fig, use_container_width=True)
+c1.metric("Net Revenue", f"${profit:,.0f}")
+c2.metric("Margin", f"{margin:.1%}")
 
-# Sensitivity analysis
-st.subheader("FX Sensitivity Analysis")
+sens = []
 
-fx_range = [x / 10 for x in range(100, 301)]
+for scenario_fx in range(10, 31):
+    mxn_usd_s = mxn_local / scenario_fx
+    cost_s = mxn_usd_s + usd_cost
 
-profits = []
+    sens.append({
+        "FX": scenario_fx,
+        "Net Revenue": revenue - cost_s
+    })
 
-for fx in fx_range:
-    mxn_cost_usd = mxn_cost_local / fx
-    total_cost = mxn_cost_usd + usd_cost
-    profit = revenue_usd - total_cost
-    profits.append(profit)
+sens_df = pd.DataFrame(sens).set_index("FX")
 
-sens_df = pd.DataFrame({
-    "FX Rate": fx_range,
-    "Net Revenue": profits
-})
-
-fig2 = go.Figure()
-
-fig2.add_trace(
-    go.Scatter(
-        x=sens_df["FX Rate"],
-        y=sens_df["Net Revenue"],
-        mode="lines",
-        name="Net Revenue"
-    )
-)
-
-fig2.add_vline(
-    x=current_fx,
-    line_dash="dash",
-    annotation_text=f"Current FX: {current_fx:.1f}"
-)
-
-fig2.update_layout(
-    title="Net Revenue vs FX Rate",
-    xaxis_title="MXN/USD",
-    yaxis_title="Net Revenue (USD)",
-    height=500
-)
-
-st.plotly_chart(fig2, use_container_width=True)
-
-# Metrics
-col1, col2, col3 = st.columns(3)
-
-col1.metric("Revenue", f"${revenue_usd:,.0f}")
-col2.metric("Total Costs", f"${total_cost_current:,.0f}")
-col3.metric("Net Revenue", f"${gross_profit:,.0f}")
-
-# Cost breakdown
-st.subheader("Cost Breakdown")
-
-breakdown = pd.DataFrame({
-    "Cost Type": ["MXN Costs (USD Equivalent)", "USD Costs"],
-    "Amount": [mxn_cost_usd_current, usd_cost]
-})
-
-st.dataframe(
-    breakdown.style.format({"Amount": "${:,.0f}"}),
-    use_container_width=True
-)
+st.subheader("Net Revenue Sensitivity")
+st.line_chart(sens_df)
