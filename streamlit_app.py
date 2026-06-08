@@ -299,47 +299,49 @@ st.caption(
     "Modelo simplificado para análisis de sensibilidad de EBITDA de Autlán."
 )
 
+
+
+
 import numpy as np
 import plotly.express as px
 
-tc_range = np.arange(15, 23, 0.25)
+st.subheader("🌎 Sensibilidad EBITDA vs Tipo de Cambio")
+
+fx_range = np.arange(14, 24.5, 0.5)
 
 ebitda_fx = []
 
-for tc in tc_range:
+for tc in fx_range:
 
-    ingresos_mxn = ingresos * tc
+    # Parte MXN fija
+    cogs_mxn_fijo = cogs_total * 0.85 * tipo_cambio
 
-    cogs_usd = cogs_total * 0.15
+    cogs_usd_tc = cogs_usd_fijo + (cogs_mxn_fijo / tc)
 
-    cogs_mxn_fijos = cogs_total * 0.85 * tipo_cambio
+    utilidad_bruta_tc = ingresos - cogs_usd_tc
 
-    cogs_total_usd = cogs_usd + (cogs_mxn_fijos / tc)
-
-    utilidad_bruta_fx = ingresos - cogs_total_usd
-
-    utilidad_operacion_fx = (
-        utilidad_bruta_fx
+    utilidad_operacion_tc = (
+        utilidad_bruta_tc
         - gastos_venta
         - gastos_admin
         + otros_ingresos
         - otros_gastos
     )
 
-    ebitda_fx.append(
-        utilidad_operacion_fx + depreciacion_amortizacion
-    )
+    ebitda_tc = utilidad_operacion_tc + depreciacion_amortizacion
+
+    ebitda_fx.append(ebitda_tc)
 
 df_fx = pd.DataFrame({
-    "Tipo Cambio": tc_range,
+    "Tipo de Cambio": fx_range,
     "EBITDA": ebitda_fx
 })
 
 fig_fx = px.line(
     df_fx,
-    x="Tipo Cambio",
+    x="Tipo de Cambio",
     y="EBITDA",
-    title="Sensibilidad EBITDA vs Tipo de Cambio"
+    title="Impacto del Tipo de Cambio en EBITDA"
 )
 
 st.plotly_chart(fig_fx, use_container_width=True)
