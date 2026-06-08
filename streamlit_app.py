@@ -298,3 +298,48 @@ st.dataframe(
 st.caption(
     "Modelo simplificado para análisis de sensibilidad de EBITDA de Autlán."
 )
+
+import numpy as np
+import plotly.express as px
+
+tc_range = np.arange(15, 23, 0.25)
+
+ebitda_fx = []
+
+for tc in tc_range:
+
+    ingresos_mxn = ingresos * tc
+
+    cogs_usd = cogs_total * 0.15
+
+    cogs_mxn_fijos = cogs_total * 0.85 * tipo_cambio
+
+    cogs_total_usd = cogs_usd + (cogs_mxn_fijos / tc)
+
+    utilidad_bruta_fx = ingresos - cogs_total_usd
+
+    utilidad_operacion_fx = (
+        utilidad_bruta_fx
+        - gastos_venta
+        - gastos_admin
+        + otros_ingresos
+        - otros_gastos
+    )
+
+    ebitda_fx.append(
+        utilidad_operacion_fx + depreciacion_amortizacion
+    )
+
+df_fx = pd.DataFrame({
+    "Tipo Cambio": tc_range,
+    "EBITDA": ebitda_fx
+})
+
+fig_fx = px.line(
+    df_fx,
+    x="Tipo Cambio",
+    y="EBITDA",
+    title="Sensibilidad EBITDA vs Tipo de Cambio"
+)
+
+st.plotly_chart(fig_fx, use_container_width=True)
