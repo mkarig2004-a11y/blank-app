@@ -1,301 +1,300 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    page_title="Simulador EBITDA - Autlán",
+    page_icon="📈",
+    layout="wide"
+)
 
-st.title("Income Statement - FX & Interest Rate Sensitivity")
+st.title("📈 Simulador de EBITDA - Autlán")
+st.markdown("Modelo simplificado para analizar sensibilidad de EBITDA ante ingresos y tipo de cambio.")
 
-# =========================
+# =====================================
 # INPUTS
-# =========================
+# =====================================
 
-col1, col2 = st.columns(2)
+st.sidebar.header("Supuestos")
 
-with col1:
-
-    revenue = st.number_input(
-        "Revenue (USD)",
-        value=10000000.0,
-        step=100000.0
-    )
-
-    operating_expenses = st.number_input(
-        "Operating Expenses (USD)",
-        value=1000000.0,
-        step=50000.0
-    )
-
-    interest_usd = st.number_input(
-        "Interest Expense USD",
-        value=500000.0,
-        step=10000.0
-    )
-
-with col2:
-
-    base_fx = st.number_input(
-        "Base Spot FX (MXN/USD)",
-        value=17.0,
-        step=0.1
-    )
-
-    fx = st.slider(
-        "Current FX (MXN/USD)",
-        min_value=10.0,
-        max_value=30.0,
-        value=17.0,
-        step=0.1
-    )
-
-    tiie = st.slider(
-        "TIIE (%)",
-        min_value=5.0,
-        max_value=15.0,
-        value=10.0,
-        step=0.25
-    )
-
-# =========================
-# COGS
-# =========================
-
-usd_cogs = revenue * 0.15
-
-mxn_cogs_local = revenue * 0.70 * base_fx
-mxn_cogs_usd = mxn_cogs_local / fx
-
-total_cogs = usd_cogs + mxn_cogs_usd
-
-gross_profit = revenue - total_cogs
-
-gross_margin = (
-    gross_profit / revenue
-    if revenue > 0
-    else 0
+ingresos = st.sidebar.number_input(
+    "Ingresos (USD)",
+    min_value=0.0,
+    value=500_000_000.0,
+    step=1_000_000.0,
+    format="%.2f"
 )
 
-# =========================
-# EBIT
-# =========================
+tipo_cambio = st.sidebar.number_input(
+    "Tipo de Cambio Spot (MXN/USD)",
+    min_value=1.0,
+    value=18.50,
+    step=0.10
+)
 
-ebit = gross_profit - operating_expenses
+st.sidebar.markdown("---")
 
-# =========================
-# DEBT INTEREST
-# =========================
+gastos_venta = st.sidebar.number_input(
+    "Gastos de Venta (USD)",
+    value=15_000_000.0,
+    step=100_000.0
+)
 
-mxn_debt = 260_000_000
+gastos_admin = st.sidebar.number_input(
+    "Gastos de Administración (USD)",
+    value=20_000_000.0,
+    step=100_000.0
+)
 
-total_rate = (tiie + 4.0) / 100
+otros_ingresos = st.sidebar.number_input(
+    "Otros Ingresos (USD)",
+    value=0.0,
+    step=100_000.0
+)
 
-interest_mxn = mxn_debt * total_rate
+otros_gastos = st.sidebar.number_input(
+    "Otros Gastos (USD)",
+    value=0.0,
+    step=100_000.0
+)
 
-interest_mxn_usd = interest_mxn / fx
+ingresos_financieros = st.sidebar.number_input(
+    "Ingresos Financieros (USD)",
+    value=2_000_000.0,
+    step=100_000.0
+)
 
-total_interest = interest_usd + interest_mxn_usd
+gastos_financieros = st.sidebar.number_input(
+    "Gastos Financieros (USD)",
+    value=25_000_000.0,
+    step=100_000.0
+)
 
-# =========================
-# EBT
-# =========================
+depreciacion_amortizacion = st.sidebar.number_input(
+    "Depreciación y Amortización (USD)",
+    value=30_000_000.0,
+    step=100_000.0
+)
 
-ebt = ebit - total_interest
+# =====================================
+# COGS MODEL
+# =====================================
 
-# =========================
+cogs_total = ingresos * 0.85
+
+cogs_usd_fijo = cogs_total * 0.15
+cogs_mxn = cogs_total * 0.85
+
+# Convertimos la parte en MXN a dólares usando TC spot
+cogs_mxn_en_usd = (cogs_mxn * tipo_cambio) / tipo_cambio
+
+# costo total en USD
+cogs_total_ajustado = cogs_usd_fijo + cogs_mxn_en_usd
+
+# =====================================
+# ESTADO DE RESULTADOS
+# =====================================
+
+utilidad_bruta = ingresos - cogs_total_ajustado
+
+utilidad_operacion = (
+    utilidad_bruta
+    - gastos_venta
+    - gastos_admin
+    + otros_ingresos
+    - otros_gastos
+)
+
+utilidad_antes_impuestos = (
+    utilidad_operacion
+    + ingresos_financieros
+    - gastos_financieros
+)
+
+ebitda = utilidad_operacion + depreciacion_amortizacion
+
+margen_bruto = utilidad_bruta / ingresos if ingresos > 0 else 0
+margen_operacion = utilidad_operacion / ingresos if ingresos > 0 else 0
+margen_ebitda = ebitda / ingresos if ingresos > 0 else 0
+
+# =====================================
 # KPIs
-# =========================
+# =====================================
 
-st.subheader("Key Metrics")
+st.subheader("📊 Indicadores")
 
-k1, k2, k3, k4 = st.columns(4)
+col1, col2, col3, col4 = st.columns(4)
 
-k1.metric(
-    "Gross Profit",
-    f"${gross_profit:,.0f}"
+col1.metric(
+    "Ingresos",
+    f"${ingresos:,.0f}"
 )
 
-k2.metric(
-    "Gross Margin",
-    f"{gross_margin:.1%}"
+col2.metric(
+    "Utilidad Bruta",
+    f"${utilidad_bruta:,.0f}"
 )
 
-k3.metric(
-    "EBIT",
-    f"${ebit:,.0f}"
+col3.metric(
+    "EBITDA",
+    f"${ebitda:,.0f}"
 )
 
-k4.metric(
-    "EBT",
-    f"${ebt:,.0f}"
+col4.metric(
+    "Margen EBITDA",
+    f"{margen_ebitda:.1%}"
 )
 
-# =========================
-# INCOME STATEMENT
-# =========================
+# =====================================
+# DETALLE COGS
+# =====================================
 
-income_statement = pd.DataFrame({
-    "Line Item": [
-        "Revenue",
-        "COGS USD",
-        "COGS MXN (USD Eq.)",
-        "Total COGS",
-        "Gross Profit",
-        "Operating Expenses",
-        "EBIT",
-        "Interest USD",
-        "Interest MXN (USD Eq.)",
-        "EBT"
+st.subheader("⚙️ Desglose de Costo de Ventas")
+
+detalle_cogs = pd.DataFrame({
+    "Concepto": [
+        "COGS Total (85% ventas)",
+        "Parte USD (15%)",
+        "Parte MXN (85%)",
+        "Tipo de Cambio",
+        "COGS Total Ajustado"
+    ],
+    "Valor": [
+        cogs_total,
+        cogs_usd_fijo,
+        cogs_mxn,
+        tipo_cambio,
+        cogs_total_ajustado
+    ]
+})
+
+st.dataframe(
+    detalle_cogs,
+    use_container_width=True,
+    hide_index=True
+)
+
+# =====================================
+# ESTADO DE RESULTADOS
+# =====================================
+
+st.subheader("📄 Estado de Resultados Simplificado")
+
+estado_resultados = pd.DataFrame({
+    "Concepto": [
+        "Ingresos",
+        "Costo de Ventas",
+        "Utilidad Bruta",
+        "Gastos de Venta",
+        "Gastos de Administración",
+        "Otros Ingresos",
+        "Otros Gastos",
+        "Utilidad Operativa",
+        "Ingresos Financieros",
+        "Gastos Financieros",
+        "Utilidad Antes de Impuestos",
+        "Depreciación y Amortización",
+        "EBITDA"
     ],
     "USD": [
-        revenue,
-        -usd_cogs,
-        -mxn_cogs_usd,
-        -total_cogs,
-        gross_profit,
-        -operating_expenses,
-        ebit,
-        -interest_usd,
-        -interest_mxn_usd,
-        ebt
+        ingresos,
+        -cogs_total_ajustado,
+        utilidad_bruta,
+        -gastos_venta,
+        -gastos_admin,
+        otros_ingresos,
+        -otros_gastos,
+        utilidad_operacion,
+        ingresos_financieros,
+        -gastos_financieros,
+        utilidad_antes_impuestos,
+        depreciacion_amortizacion,
+        ebitda
     ]
 })
 
-st.subheader("Income Statement")
-
 st.dataframe(
-    income_statement,
-    use_container_width=True
+    estado_resultados.style.format({"USD": "${:,.0f}"}),
+    use_container_width=True,
+    hide_index=True
 )
 
-# =========================
-# DETAILS
-# =========================
+# =====================================
+# MÁRGENES
+# =====================================
 
-st.subheader("Debt Details")
+st.subheader("📈 Márgenes")
 
-debt_df = pd.DataFrame({
-    "Metric": [
-        "MXN Debt",
-        "TIIE",
-        "Spread",
-        "Total Rate",
-        "Interest MXN",
-        "Interest MXN (USD Eq.)"
+margenes = pd.DataFrame({
+    "Indicador": [
+        "Margen Bruto",
+        "Margen Operativo",
+        "Margen EBITDA"
     ],
-    "Value": [
-        f"{mxn_debt:,.0f}",
-        f"{tiie:.2f}%",
-        "4.00%",
-        f"{(tiie+4):.2f}%",
-        f"{interest_mxn:,.0f}",
-        f"${interest_mxn_usd:,.0f}"
+    "Valor": [
+        margen_bruto,
+        margen_operacion,
+        margen_ebitda
     ]
 })
 
 st.dataframe(
-    debt_df,
-    use_container_width=True
+    margenes.style.format({"Valor": "{:.1%}"}),
+    use_container_width=True,
+    hide_index=True
 )
 
-# =========================
-# FX SENSITIVITY
-# =========================
+# =====================================
+# SENSIBILIDAD TIPO DE CAMBIO
+# =====================================
 
-sens = []
+st.subheader("🌎 Sensibilidad Tipo de Cambio")
 
-for scenario_fx in range(10, 31):
+escenarios = [15, 16, 17, 18, 19, 20, 21, 22]
 
-    scenario_mxn_cogs_usd = mxn_cogs_local / scenario_fx
+sensibilidad = []
 
-    scenario_interest_usd = interest_mxn / scenario_fx
+for tc in escenarios:
 
-    scenario_total_cogs = (
-        usd_cogs +
-        scenario_mxn_cogs_usd
+    cogs_tc = cogs_usd_fijo + ((cogs_mxn * tc) / tc)
+
+    utilidad_bruta_tc = ingresos - cogs_tc
+
+    utilidad_operacion_tc = (
+        utilidad_bruta_tc
+        - gastos_venta
+        - gastos_admin
+        + otros_ingresos
+        - otros_gastos
     )
 
-    scenario_gp = revenue - scenario_total_cogs
+    ebitda_tc = utilidad_operacion_tc + depreciacion_amortizacion
 
-    scenario_ebit = (
-        scenario_gp -
-        operating_expenses
-    )
+    margen_tc = ebitda_tc / ingresos
 
-    scenario_ebt = (
-        scenario_ebit -
-        interest_usd -
-        scenario_interest_usd
-    )
+    sensibilidad.append([
+        tc,
+        ebitda_tc,
+        margen_tc
+    ])
 
-    sens.append({
-        "FX": scenario_fx,
-        "EBT": scenario_ebt
-    })
-
-sens_df = pd.DataFrame(sens).set_index("FX")
-
-st.subheader("EBT Sensitivity to FX")
-
-st.line_chart(sens_df)
-
-# =========================
-# TIIE SENSITIVITY
-# =========================
-
-st.subheader("EBT Sensitivity to TIIE")
-
-tiie_sensitivity = []
-
-for scenario_tiie in range(5, 16):
-
-    scenario_rate = (scenario_tiie + 4) / 100
-
-    scenario_interest_mxn = (
-        mxn_debt *
-        scenario_rate
-    )
-
-    scenario_interest_usd = (
-        scenario_interest_mxn /
-        fx
-    )
-
-    scenario_ebt = (
-        ebit
-        - interest_usd
-        - scenario_interest_usd
-    )
-
-    tiie_sensitivity.append({
-        "TIIE (%)": scenario_tiie,
-        "EBT": scenario_ebt
-    })
-
-tiie_df = pd.DataFrame(
-    tiie_sensitivity
-).set_index("TIIE (%)")
-
-st.line_chart(tiie_df)
-
-st.subheader("Financial Drivers")
-
-drivers = pd.DataFrame({
-    "Metric": [
-        "Current FX",
-        "TIIE",
-        "Spread",
-        "Total Interest Rate",
-        "MXN Debt"
-    ],
-    "Value": [
-        f"{fx:.2f}",
-        f"{tiie:.2f}%",
-        "4.00%",
-        f"{tiie+4:.2f}%",
-        f"{mxn_debt:,.0f}"
+df_sensibilidad = pd.DataFrame(
+    sensibilidad,
+    columns=[
+        "Tipo Cambio",
+        "EBITDA",
+        "Margen EBITDA"
     ]
-})
+)
 
 st.dataframe(
-    drivers,
-    use_container_width=True
+    df_sensibilidad.style.format({
+        "EBITDA": "${:,.0f}",
+        "Margen EBITDA": "{:.1%}"
+    }),
+    use_container_width=True,
+    hide_index=True
+)
+
+st.caption(
+    "Modelo simplificado para análisis de sensibilidad de EBITDA de Autlán."
 )
